@@ -29,6 +29,12 @@ class TranslatableDataObject extends DataExtension
 	
 	// lock to prevent endless loop
 	protected static $collectorLock = array();
+
+	/**
+	 * Show native language names in generated tabs
+	 * @var bool
+	 */
+	private static $show_native_language_names = true;
 	
 	/**
 	 * Use table information and locales to dynamically build required table fields
@@ -87,7 +93,7 @@ class TranslatableDataObject extends DataExtension
 	 * @param string $title the title of the tabset to return. Defaults to "Root"
 	 * @return TabSet
 	 */
-	public function getTranslatableTabSet($title = 'Root'){
+	public function getTranslatableTabSet($title = 'Root', $showOrig = true){
 		$set = new TabSet($title);
 		
 		// get target locales
@@ -112,7 +118,7 @@ class TranslatableDataObject extends DataExtension
 		
 		foreach($locales as $locale){
 			$langName = ucfirst(html_entity_decode(
-							i18n::get_language_name(i18n::get_lang_from_locale($locale), true),
+							i18n::get_language_name(i18n::get_lang_from_locale($locale), Config::inst()->get('TranslatableDataObject', 'show_native_language_names')),
 							ENT_NOQUOTES, 'UTF-8'));
 			
 			if(isset($ambiguity[$locale])){
@@ -121,12 +127,24 @@ class TranslatableDataObject extends DataExtension
 			$tab = new Tab($locale, $langName);
 			
 			foreach ($fieldNames as $fieldName) {
-				$tab->push($this->getLocalizedFormField($fieldName, $locale));
+				$localizedField = $this->getLocalizedFormField($fieldName, $locale);
+				$tab->push($localizedField);
+				if ($locale !== Translatable::default_locale()) {
+					//show orig value
+					$orig = $this->getLocalizedFormField($fieldName, Translatable::default_locale())
+						->setValue($this->owner->getField($fieldName))
+						->performReadonlyTransformation()
+						->setTitle($localizedField->Title() . 'original')
+						->setName($localizedField->getName() . '_orig');
+
+					$tab->push($orig);
+				}
 			}
 
 			//@todo: how to preserve order of fields?
 			foreach ($relationNames as $fieldName) {
 				if ($relationField = $this->getLocalizedRelationField($fieldName, $locale)) {
+
 					$tab->push($relationField);
 				}
 			}
